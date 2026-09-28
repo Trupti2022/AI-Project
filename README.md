@@ -63,6 +63,64 @@ Task.java — The Domain Model
 
 TaskStatus.java — The State Machine
 
+**Work Process**
+
+On Architecture:
+
+▎ "The backend is Spring Boot with three layers: REST API for task CRUD, a WebSocket handler for real-time push to the associate's device, and an AI service that calls Claude to score task urgency. I chose H2 in-memory DB for the PoC to keep it zero-config, but it maps directly to PostgreSQL in production."
+
+On the AI integration:
+
+▎ "The AI doesn't just assign a number — it reasons about context. It sees the associate's current task list alongside the new task. So if an associate already has a BOPIS order in progress and a safety hazard arrives, Claude understands that safety hazards always outrank order fulfillment. The score plus reasoning surfaces directly in the UI so the associate understands why their task order changed."
+
+On the auto-pause logic:
+
+▎ "When a high-priority task arrives, the service layer automatically pauses any lower-priority IN_PROGRESS task before creating the new one. The associate doesn't have to manually juggle tasks — the system handles the interruption, and they can resume later."
+
+On WebSocket vs polling:
+
+▎ "I used raw WebSocket rather than polling because task priority interruptions are time-critical. If a spill happens and the associate's phone only refreshes every 30 seconds, that's a safety gap. With WebSocket, the update is pushed in under 100ms."
+
+On the demo fallback:
+
+▎ "The AI service has a graceful degradation path — if the API key isn't configured or the Claude call fails, it falls back to deterministic keyword scoring. This means the app is always functional even without external dependencies, which matters for reliability."
+
+Setup (30 seconds before they arrive)
+
+Open two browser windows side by side — both on http://localhost:3000:
+- Left window → click "👤 Associate" tab
+- Right window → click "👔 Manager" tab
+
+This visually shows the two roles simultaneously.
+
+---
+
+The Demo Narrative (walk through this live)
+
+Step 1 — Start a planned task
+- On the Manager side: click "📋 Restock Frozen Aisle"
+- On the Associate side: task appears in Queue with score 40
+- Click ▶ Start — it moves to In Progress
+- Say: "Alex starts the planned shelf restock"
+
+Step 2 — BOPIS order arrives
+- On Manager: click "📦 New BOPIS Order"
+- Watch the Associate side update instantly (no refresh — that's the WebSocket)
+- The restock auto-pauses, BOPIS appears at top with score 75
+- Say: "A customer order comes in — AI scores it 75, higher than the restock, so the system automatically pauses the shelf work"
+- Point to the purple italic text: "🤖 Customer order with time commitment..." — that's the AI reasoning
+
+Step 3 — Safety emergency
+- On Manager: click "🚨 Milk Spill Aisle 3"
+- Watch everything shift — spill jumps to top with score 95, red priority bar
+- Say: "Manager spots a spill. AI scores it 95 — safety always wins. Associate sees this in real time, no phone call needed"
+
+Step 4 — Resume the original task
+- After completing the spill, click ✓ Complete
+- The BOPIS order is still there — click ▶ Resume
+- Then eventually resume the restock
+- Say: "Nothing is lost — paused tasks stay in the queue and can be resumed in order"
+
 PENDING → IN_PROGRESS → COMPLETED
               ↕
            PAUSED
